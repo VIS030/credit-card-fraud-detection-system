@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { 
   DollarSign, 
   AlertOctagon, 
@@ -26,6 +26,7 @@ import {
   Transaction 
 } from "@/lib/mock-data"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { ApiClient } from "@/lib/api-client"
 import { 
   ResponsiveContainer, 
   AreaChart, 
@@ -39,8 +40,86 @@ import Link from "next/link"
 
 export default function DashboardPage() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
-  const stats = MOCK_DASHBOARD_STATS
-  const recentAlerts = MOCK_HISTORY_TRANSACTIONS.filter(t => t.predictionClass === 1).slice(0, 3)
+  const [stats, setStats] = useState(MOCK_DASHBOARD_STATS)
+  const [recentAlerts, setRecentAlerts] = useState<Transaction[]>(
+    MOCK_HISTORY_TRANSACTIONS.filter(t => t.predictionClass === 1).slice(0, 3)
+  )
+  const [analyticsData, setAnalyticsData] = useState(MOCK_ANALYTICS_TRENDS)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadData() {
+      try {
+        const [metricsRes, historyRes, analyticsRes] = await Promise.allSettled([
+          ApiClient.getDashboardMetrics(),
+          ApiClient.getHistory("all", 50),
+          ApiClient.getAnalyticsTrends()
+        ]);
+
+        if (!isMounted) return;
+
+        if (metricsRes.status === "fulfilled" && metricsRes.value) {
+          const m = metricsRes.value;
+          setStats(prev => ({
+            ...prev,
+            totalProcessed: m.total_processed || prev.totalProcessed,
+            processedVolume: m.processed_volume || prev.processedVolume,
+            fraudAlerts: m.fraud_alerts || prev.fraudAlerts,
+            falsePositives: m.false_positives || prev.falsePositives,
+            avgRiskScore: m.avg_risk_score !== undefined ? m.avg_risk_score : prev.avgRiskScore,
+            latencyMs: m.latency_ms || prev.latencyMs,
+          }));
+        }
+
+        if (historyRes.status === "fulfilled" && Array.isArray(historyRes.value)) {
+          const dbTxList: Transaction[] = historyRes.value.map((item: any) => ({
+            id: item.id.substring(0, 8),
+            timestamp: item.timestamp,
+            amount: item.amount,
+            time: item.time,
+            pcaFeatures: item.pca_features || {},
+            fraudProbability: item.fraud_probability,
+            predictionClass: item.prediction_class,
+            userOverride: item.user_override,
+            merchant: item.merchant || "Digital Merchant",
+            cardBrand: (item.card_brand as any) || "visa",
+            cardLast4: item.card_last4 || "4321",
+            location: item.location || "Online",
+            shapValues: item.shap_values || {},
+            riskFactors: item.risk_factors || []
+          }));
+
+          if (dbTxList.length > 0) {
+            const flagged = dbTxList.filter(t => (t.userOverride ?? t.predictionClass) === 1);
+            setRecentAlerts(flagged.length > 0 ? flagged.slice(0, 3) : dbTxList.slice(0, 3));
+            setStats(prev => ({
+              ...prev,
+              activeAlerts: flagged.slice(0, 3).map(a => ({
+                id: a.id,
+                amount: a.amount,
+                probability: a.fraudProbability,
+                merchant: a.merchant,
+                location: a.location,
+                timeAgo: "Live Audit Log"
+              }))
+            }));
+          }
+        }
+
+        if (analyticsRes.status === "fulfilled" && analyticsRes.value) {
+          setAnalyticsData(analyticsRes.value);
+        }
+      } catch (err) {
+        console.warn("Failed to load live metrics from backend:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadData();
+    return () => { isMounted = false; };
+  }, [])
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">

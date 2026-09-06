@@ -32,14 +32,24 @@ export class ApiClient {
       headers["Content-Type"] = "application/json";
     }
 
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    } catch (error: any) {
+      console.error(`Network error calling ${API_BASE_URL}${endpoint}:`, error);
+      throw new Error(
+        `Unable to connect to FraudShield AI backend at ${API_BASE_URL}. Please ensure the FastAPI server is running.`
+      );
+    }
 
     if (response.status === 401) {
-      // Clear token and handle unauthorized
       this.clearTokens();
+      if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?reason=session_expired";
+      }
     }
 
     if (!response.ok) {

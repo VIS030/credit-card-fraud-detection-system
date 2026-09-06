@@ -88,14 +88,18 @@ export default function SinglePredictPage() {
     setResult(null)
 
     try {
+      const timeVal = Number(data.time) || 0
+      const amountVal = Number(data.amount) || 0.01
+
       const pca_features: Record<string, number> = {}
       for (let i = 1; i <= 28; i++) {
-        pca_features[`V${i}`] = (data as any)[`V${i}`] || 0
+        const val = (data as any)[`V${i}`]
+        pca_features[`V${i}`] = (val !== undefined && val !== null && !isNaN(Number(val))) ? Number(val) : 0
       }
 
       const res = await ApiClient.predictSingle({
-        time: data.time,
-        amount: data.amount,
+        time: timeVal,
+        amount: amountVal,
         pca_features
       })
 
@@ -103,32 +107,13 @@ export default function SinglePredictPage() {
         id: res.id,
         fraudProbability: res.fraud_probability,
         predictionClass: res.prediction_class as 0 | 1,
-        shapValues: res.shap_values || { V14: -0.38, V17: -0.45, Amount: 0.28 },
+        shapValues: res.shap_values || {},
         riskFactors: res.risk_factors || []
       })
-    } catch (err) {
-      console.warn("Backend prediction call exception, using fallback calculation:", err)
-      let probability = 0.0012
-      let riskFactors: string[] = []
-      let shapValues: Record<string, number> = { V12: 0.05, Amount: -0.02 }
-
-      if (data.amount > 1000 && data.V14 < -3) {
-        probability = 0.9650
-        riskFactors = ["Extreme negative deviance on anomaly vectors", "High amount threshold exceeded"]
-        shapValues = { V14: -0.38, V17: -0.45, Amount: 0.28, V4: 0.12 }
-      } else if (data.V14 < -1 || data.amount > 400) {
-        probability = 0.5840
-        riskFactors = ["Anomalous variance signatures in principal component metrics"]
-        shapValues = { V14: -0.22, V12: -0.18, Amount: 0.12 }
-      }
-
-      setResult({
-        id: `manual-tx-${Math.floor(Math.random() * 9000 + 1000)}`,
-        fraudProbability: probability,
-        predictionClass: probability > 0.5 ? 1 : 0,
-        shapValues,
-        riskFactors
-      })
+    } catch (err: any) {
+      console.error("Backend prediction call exception:", err)
+      const errorMsg = err?.message || "Prediction request failed. Ensure API server is operational."
+      alert(`API Error: ${errorMsg}`)
     } finally {
       setRunning(false)
     }

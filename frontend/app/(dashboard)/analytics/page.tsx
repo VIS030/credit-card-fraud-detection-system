@@ -1,13 +1,34 @@
 "use client"
 
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, LineChart, Line } from "recharts"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { MOCK_ANALYTICS_TRENDS } from "@/lib/mock-data"
+import { ApiClient } from "@/lib/api-client"
 import { ShieldCheck, BarChart3, TrendingUp, Sparkles } from "lucide-react"
 
 export default function AnalyticsPage() {
-  const trends = MOCK_ANALYTICS_TRENDS
+  const [trends, setTrends] = useState(MOCK_ANALYTICS_TRENDS)
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTrends() {
+      try {
+        const res = await ApiClient.getAnalyticsTrends();
+        if (isMounted && res) {
+          setTrends(prev => ({
+            dailyPerformance: res.dailyPerformance || prev.dailyPerformance,
+            amountDistribution: res.amountDistribution || prev.amountDistribution,
+            topCorrelations: res.topCorrelations || prev.topCorrelations
+          }));
+        }
+      } catch (err) {
+        console.warn("Could not fetch live analytics trends, using cached trends:", err);
+      }
+    }
+    loadTrends();
+    return () => { isMounted = false; };
+  }, [])
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">

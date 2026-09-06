@@ -1,18 +1,18 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from app.database.guid import GUID
 from app.database.session import Base
 
 
 class PredictionHistory(Base):
     __tablename__ = "prediction_history"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    model_version_id = Column(UUID(as_uuid=True), ForeignKey("model_versions.id"), nullable=True)
-    file_id = Column(UUID(as_uuid=True), ForeignKey("uploaded_files.id"), nullable=True)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), ForeignKey("users.id"), nullable=False)
+    model_version_id = Column(GUID(), ForeignKey("model_versions.id"), nullable=True)
+    file_id = Column(GUID(), ForeignKey("uploaded_files.id"), nullable=True)
 
     transaction_amount = Column(Float, nullable=False)
     transaction_time = Column(Float, nullable=False)

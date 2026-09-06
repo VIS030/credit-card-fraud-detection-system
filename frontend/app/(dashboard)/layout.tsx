@@ -1,15 +1,56 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/dashboard"
-import { Menu, X, ShieldAlert, Cpu, Database, Activity } from "lucide-react"
+import { Menu, X, ShieldAlert, Cpu, Database, Activity, LogOut, User as UserIcon } from "lucide-react"
+import { ApiClient } from "@/lib/api-client"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null)
+  const [userEmail, setUserEmail] = useState<string>("admin@fraudguard.ai")
+
+  useEffect(() => {
+    async function checkAuth() {
+      try {
+        const profile = await ApiClient.getProfile()
+        if (profile && profile.email) {
+          setUserEmail(profile.email)
+          setAuthenticated(true)
+        } else {
+          setAuthenticated(false)
+          router.push("/login?reason=unauthenticated")
+        }
+      } catch (err) {
+        setAuthenticated(false)
+        router.push("/login?reason=unauthenticated")
+      }
+    }
+
+    checkAuth()
+  }, [router])
+
+  const handleLogout = () => {
+    ApiClient.clearTokens()
+    router.push("/login")
+  }
+
+  if (authenticated === null) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#030303] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span className="text-xs text-muted">Verifying Cryptographic Session Token...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#030303] text-foreground font-sans">
@@ -72,10 +113,17 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="px-2.5 py-1 rounded bg-[#09090b] border border-border text-[10px] text-zinc-400 font-mono flex items-center gap-1.5 uppercase font-bold tracking-wider">
-              <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
-              Evaluation Mode
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-[#09090b] text-xs text-zinc-300">
+              <UserIcon className="h-3.5 w-3.5 text-primary" />
+              <span className="font-mono text-[11px]">{userEmail}</span>
             </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-white/5 hover:bg-danger/10 hover:border-danger/30 text-xs font-semibold text-zinc-300 hover:text-danger transition-colors cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Log Out</span>
+            </button>
           </div>
         </header>
 

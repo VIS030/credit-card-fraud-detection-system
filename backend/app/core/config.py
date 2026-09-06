@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/fraudguard"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./fraudguard.db")
 
     # JWT
     SECRET_KEY: str = "super-secret-key-change-in-production-f8a3b2c1d4e5"
@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+    ]
 
     # ML Model
     MODEL_PATH: str = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "fraud_model.pkl")

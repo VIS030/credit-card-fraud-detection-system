@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
@@ -9,6 +9,7 @@ import { Dialog } from "@/components/ui/dialog"
 import { ShapForcePlot } from "@/components/ml/shap-force-plot"
 import { MOCK_HISTORY_TRANSACTIONS, Transaction } from "@/lib/mock-data"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
+import { ApiClient } from "@/lib/api-client"
 import { ShieldCheck, AlertTriangle, Search, Filter, SlidersHorizontal, Check, RefreshCw } from "lucide-react"
 
 export default function HistoryPage() {
@@ -16,8 +17,45 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [classFilter, setClassFilter] = useState<string>("all")
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Filter transactions based on query inputs
+  useEffect(() => {
+    let isMounted = true;
+    async function loadHistory() {
+      try {
+        const historyRes = await ApiClient.getHistory(classFilter, 100);
+        if (!isMounted) return;
+        if (Array.isArray(historyRes) && historyRes.length > 0) {
+          const dbTxList: Transaction[] = historyRes.map((item: any) => ({
+            id: item.id,
+            timestamp: item.timestamp,
+            amount: item.amount,
+            time: item.time,
+            pcaFeatures: item.pca_features || {},
+            fraudProbability: item.fraud_probability,
+            predictionClass: item.prediction_class,
+            userOverride: item.user_override,
+            merchant: item.merchant || "Digital Merchant",
+            cardBrand: (item.card_brand as any) || "visa",
+            cardLast4: item.card_last4 || "4321",
+            location: item.location || "Online",
+            shapValues: item.shap_values || {},
+            riskFactors: item.risk_factors || []
+          }));
+          setTransactions(dbTxList);
+        }
+      } catch (err) {
+        console.warn("Could not fetch history from API, falling back to cached logs:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+
+    loadHistory();
+    return () => { isMounted = false; };
+  }, [classFilter])
+
+  // Filter transactions based on search query
   const filtered = transactions.filter((tx) => {
     const matchesSearch = 
       tx.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -26,14 +64,19 @@ export default function HistoryPage() {
       
     const matchesClass = 
       classFilter === "all" ||
-      (classFilter === "fraud" && tx.predictionClass === 1) ||
-      (classFilter === "legit" && tx.predictionClass === 0);
+      (classFilter === "fraud" && (tx.userOverride ?? tx.predictionClass) === 1) ||
+      (classFilter === "legit" && (tx.userOverride ?? tx.predictionClass) === 0);
 
     return matchesSearch && matchesClass;
   })
 
-  // Apply analyst overrides
-  const handleOverride = (txId: string, value: 0 | 1) => {
+  // Apply analyst overrides via backend API call
+  const handleOverride = async (txId: string, value: 0 | 1) => {
+    try {
+      await ApiClient.overridePrediction(txId, value);
+    } catch (e) {
+      console.warn("Backend override call warning:", e);
+    }
     setTransactions((prev) => 
       prev.map((t) => 
         t.id === txId ? { ...t, userOverride: value } : t

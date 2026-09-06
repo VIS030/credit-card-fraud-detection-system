@@ -56,10 +56,24 @@ export default function BulkPredictPage() {
       const res = await ApiClient.predictCSV(file)
       setProgress(100)
       setStatus('completed')
-      setTotalRows(res.total_rows || 100)
-      setProcessedRows(res.total_rows || 100)
-      generateMockResults()
-    } catch (err) {
+      setTotalRows(res.total_rows || 0)
+      setProcessedRows(res.total_rows || 0)
+
+      // Fetch recent history records created by batch upload
+      const recentHistory = await ApiClient.getHistory("all", 10)
+      if (Array.isArray(recentHistory) && recentHistory.length > 0) {
+        const mapped = recentHistory.slice(0, 5).map((item: any) => ({
+          id: item.id.substring(0, 8),
+          amount: item.amount,
+          time: item.time,
+          probability: item.fraud_probability,
+          flag: item.prediction_class as 0 | 1
+        }))
+        setResults(mapped)
+      } else {
+        generateMockResults()
+      }
+    } catch (err: any) {
       console.warn("Backend CSV prediction error, using client simulation:", err)
       const uploadInterval = setInterval(() => {
         setProgress((prev) => {

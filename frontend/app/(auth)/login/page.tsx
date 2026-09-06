@@ -24,10 +24,8 @@ export default function LoginPage() {
       await ApiClient.login({ email, password })
       router.push("/dashboard")
     } catch (err: any) {
-      console.warn("Backend auth call error, using local session fallback:", err)
-      // Fallback for seamless demo testing if backend is starting
-      ApiClient.setTokens("mock_jwt_token_demo", "mock_refresh_token_demo")
-      router.push("/dashboard")
+      const errorMsg = err?.message || "Invalid email or password. Please verify credentials."
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
