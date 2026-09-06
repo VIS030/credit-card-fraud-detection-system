@@ -4,7 +4,7 @@ An enterprise-level, production-ready FinTech SaaS platform that predicts whethe
 
 ---
 
-## 🌟 Tech Stack.
+## 🌟 Tech Stack
 
 ### Frontend
 - **Framework:** Next.js 15 (App Router, React 19)
