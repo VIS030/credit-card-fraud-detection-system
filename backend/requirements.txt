@@ -13,5 +13,5 @@ scikit-learn==1.6.1
 pandas==2.2.3
 numpy==2.2.5
 joblib==1.5.3
-shap==0.52.0
+shap==0.51.0
 python-multipart==0.0.20
