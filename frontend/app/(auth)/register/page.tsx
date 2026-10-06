@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ApiClient } from "@/lib/api-client"
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter()
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -21,10 +22,11 @@ export default function LoginPage() {
     setLoading(true)
     setError("")
     try {
+      await ApiClient.register({ email, password, full_name: fullName || "Analyst" })
       await ApiClient.login({ email, password })
       router.push("/dashboard")
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Invalid email or password.")
+      setError(err instanceof Error ? err.message : "Registration failed.")
     } finally {
       setLoading(false)
     }
@@ -40,40 +42,22 @@ export default function LoginPage() {
               <ShieldAlert className="h-5 w-5 text-white" />
             </div>
             <div className="space-y-1.5">
-              <CardTitle className="text-xl font-bold tracking-tight">Security Gateway</CardTitle>
-              <CardDescription className="text-xs text-muted">
-                Sign in with your analyst account. Local seed user is documented in the README, not stored in this form.
-              </CardDescription>
+              <CardTitle className="text-xl font-bold tracking-tight">Create Analyst Account</CardTitle>
+              <CardDescription className="text-xs text-muted">Password must be at least 8 characters. Duplicate emails are rejected.</CardDescription>
             </div>
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
-              {error && (
-                <div className="p-3 rounded-lg border border-danger/20 bg-danger/5 text-xs text-danger font-medium">{error}</div>
-              )}
-              <Input label="Email" type="email" placeholder="analyst@fraudguard.ai" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} required />
-              <Input label="Password" type="password" placeholder="Enter password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} required minLength={8} />
+              {error && <div className="p-3 rounded-lg border border-danger/20 bg-danger/5 text-xs text-danger font-medium">{error}</div>}
+              <Input label="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} disabled={loading} placeholder="Analyst" />
+              <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} required />
+              <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} required minLength={8} />
             </CardContent>
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full h-11 flex justify-center items-center gap-2 text-sm font-semibold" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin text-white" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    Log In
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <>Register <ArrowRight className="h-4 w-4" /></>}
               </Button>
-              <Link href="/register" className="text-xs text-muted hover:text-foreground transition-colors">
-                Create an analyst account
-              </Link>
-              <button type="button" onClick={() => router.push("/landing")} className="text-xs text-muted hover:text-foreground transition-colors">
-                Return to landing page
-              </button>
+              <Link href="/login" className="text-xs text-muted hover:text-foreground">Already have an account? Log in</Link>
             </CardFooter>
           </form>
         </Card>

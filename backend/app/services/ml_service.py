@@ -1,29 +1,42 @@
 import os
+from typing import Dict, Any, Tuple, List
+
 import joblib
 import numpy as np
 import pandas as pd
-import shap
-from typing import Dict, Any, Tuple, List
+
 from app.core.config import get_settings
 
 settings = get_settings()
+
+FEATURE_COLUMNS_DEFAULT = [f"V{i}" for i in range(1, 29)] + ["scaled_amount", "scaled_time"]
+PCA_COLUMNS = [f"V{i}" for i in range(1, 29)]
+
+
+class MLServiceError(RuntimeError):
+    pass
+
 
 class MLService:
     def __init__(self):
         self.model = None
         self.amount_scaler = None
         self.time_scaler = None
-        self.feature_columns = None
+        self.feature_columns = FEATURE_COLUMNS_DEFAULT
         self.explainer = None
-        self.metrics = {}
+        self.metrics: Dict[str, Any] = {}
         self.is_loaded = False
+        self.load_error: str | None = None
+        self.model_path = settings.MODEL_PATH
         self.load_model()
 
     def load_model(self, model_path: str = None):
         path = model_path or settings.MODEL_PATH
+        self.model_path = path
         if not os.path.exists(path):
-            print(f"[Warning] Model file not found at {path}. Model inference will run in fallback mode.")
             self.is_loaded = False
+            self.load_error = f"Model file not found at {path}"
+            print(f"[Error] {self.load_error}")
             return
 
         try:
@@ -31,106 +44,113 @@ class MLService:
             self.model = payload.get("model")
             self.amount_scaler = payload.get("amount_scaler")
             self.time_scaler = payload.get("time_scaler")
-            self.feature_columns = payload.get("feature_columns", [f"V{i}" for i in range(1, 29)] + ['scaled_amount', 'scaled_time'])
+            self.feature_columns = payload.get("feature_columns", FEATURE_COLUMNS_DEFAULT)
             self.metrics = payload.get("metrics", {})
 
-            # Initialize SHAP TreeExplainer
-            if self.model:
-                try:
-                    self.explainer = shap.TreeExplainer(self.model)
-                except Exception as e:
-                    print(f"[Warning] Could not initialize SHAP TreeExplainer: {e}")
-                    self.explainer = None
+            if self.model is None:
+                raise ValueError("Serialized payload is missing the 'model' key")
+
+            try:
+                import shap
+
+                self.explainer = shap.TreeExplainer(self.model)
+            except Exception as e:
+                print(f"[Warning] Could not initialize SHAP TreeExplainer: {e}")
+                self.explainer = None
 
             self.is_loaded = True
+            self.load_error = None
             print(f"[Success] Loaded fraud detection model from {path}")
         except Exception as e:
-            print(f"[Error] Failed to load model from {path}: {e}")
             self.is_loaded = False
+            self.load_error = str(e)
+            print(f"[Error] Failed to load model from {path}: {e}")
 
-    def predict_single(self, time_val: float, amount_val: float, pca_features: Dict[str, float]) -> Tuple[float, int, Dict[str, float], List[str]]:
+    def _require_loaded(self):
         if not self.is_loaded or self.model is None:
-            # Fallback heuristic calculation if model file is unreadable
-            prob = 0.95 if amount_val > 1000 and pca_features.get("V14", 0) < -3 else 0.01
-            pred_class = 1 if prob > 0.5 else 0
-            shap_dict = {"V14": -0.42, "V17": -0.38, "Amount": 0.25}
-            risk_factors = ["High transaction volume relative to benchmark", "Anomalous PCA signature"] if pred_class == 1 else []
-            return prob, pred_class, shap_dict, risk_factors
+            raise MLServiceError(
+                self.load_error or "Fraud detection model is not loaded. Cannot generate predictions."
+            )
 
-        # Build feature vector matching model schema
-        row_dict = {}
-        for i in range(1, 29):
-            col = f"V{i}"
-            row_dict[col] = float(pca_features.get(col, 0.0))
+    def _scale_amount(self, amounts: np.ndarray) -> np.ndarray:
+        values = amounts.reshape(-1, 1)
+        if self.amount_scaler is not None:
+            return self.amount_scaler.transform(values).reshape(-1)
+        return amounts.astype(float)
 
-        # Scale Amount and Time
-        if self.amount_scaler:
-            scaled_amount = float(self.amount_scaler.transform([[amount_val]])[0][0])
-        else:
-            scaled_amount = float(amount_val)
+    def _scale_time(self, times: np.ndarray) -> np.ndarray:
+        values = times.reshape(-1, 1)
+        if self.time_scaler is not None:
+            return self.time_scaler.transform(values).reshape(-1)
+        return times.astype(float)
 
-        if self.time_scaler:
-            scaled_time = float(self.time_scaler.transform([[time_val]])[0][0])
-        else:
-            scaled_time = float(time_val)
+    def _feature_frame(self, pca_matrix: np.ndarray, amounts: np.ndarray, times: np.ndarray) -> pd.DataFrame:
+        scaled_amount = self._scale_amount(amounts)
+        scaled_time = self._scale_time(times)
+        data = {col: pca_matrix[:, idx] for idx, col in enumerate(PCA_COLUMNS)}
+        data["scaled_amount"] = scaled_amount
+        data["scaled_time"] = scaled_time
+        frame = pd.DataFrame(data)
+        return frame[self.feature_columns]
 
-        row_dict["scaled_amount"] = scaled_amount
-        row_dict["scaled_time"] = scaled_time
+    def _shap_for_row(self, df_row: pd.DataFrame) -> Dict[str, float]:
+        if not self.explainer:
+            return {}
+        try:
+            shap_vals = self.explainer.shap_values(df_row)
+            if isinstance(shap_vals, list):
+                vals = shap_vals[1][0] if len(shap_vals) > 1 else shap_vals[0][0]
+            else:
+                vals = shap_vals[0]
+            shap_dict = {}
+            for col, val in zip(self.feature_columns, vals):
+                display_name = "Amount" if col == "scaled_amount" else ("Time" if col == "scaled_time" else col)
+                shap_dict[display_name] = round(float(val), 4)
+            return shap_dict
+        except Exception as e:
+            print(f"[Warning] SHAP computation error: {e}")
+            return {}
 
-        # DataFrame in correct column order
-        df_row = pd.DataFrame([row_dict])[self.feature_columns]
-
-        # Model Inference
-        probs = self.model.predict_proba(df_row)[0]
-        fraud_prob = float(probs[1])
-        pred_class = int(fraud_prob >= 0.5)
-
-        # SHAP calculation
-        shap_dict = {}
-        if self.explainer:
-            try:
-                shap_vals = self.explainer.shap_values(df_row)
-                if isinstance(shap_vals, list):
-                    vals = shap_vals[1][0] if len(shap_vals) > 1 else shap_vals[0][0]
-                else:
-                    vals = shap_vals[0]
-
-                for col, val in zip(self.feature_columns, vals):
-                    display_name = "Amount" if col == "scaled_amount" else ("Time" if col == "scaled_time" else col)
-                    shap_dict[display_name] = round(float(val), 4)
-            except Exception as e:
-                print(f"[Warning] SHAP computation error: {e}")
-                shap_dict = {"V14": -0.35, "V17": -0.28, "Amount": 0.18}
-        else:
-            shap_dict = {"V14": -0.35, "V17": -0.28, "Amount": 0.18}
-
-        # Generate human-readable risk factors based on SHAP impacts
-        risk_factors = []
+    def _risk_factors(self, shap_dict: Dict[str, float], fraud_prob: float) -> List[str]:
+        risk_factors: List[str] = []
         sorted_shap = sorted(shap_dict.items(), key=lambda x: abs(x[1]), reverse=True)
         for feat, val in sorted_shap[:3]:
             if val > 0.05:
-                risk_factors.append(f"Feature '{feat}' elevated fraud probability score")
+                risk_factors.append(f"Feature '{feat}' increased the fraud score")
             elif val < -0.05:
-                risk_factors.append(f"Feature '{feat}' anomalous negative vector impact")
+                risk_factors.append(f"Feature '{feat}' decreased the fraud score")
+        if fraud_prob >= settings.FRAUD_THRESHOLD and not risk_factors:
+            risk_factors.append("Model score exceeded the fraud classification threshold")
+        return risk_factors
 
-        if fraud_prob > 0.5 and not risk_factors:
-            risk_factors.append("Statistical deviation from standard transaction pattern")
-
-        return round(fraud_prob, 4), pred_class, shap_dict, risk_factors
+    def predict_single(
+        self, time_val: float, amount_val: float, pca_features: Dict[str, float]
+    ) -> Tuple[float, int, Dict[str, float], List[str]]:
+        self._require_loaded()
+        pca_matrix = np.array([[float(pca_features[col]) for col in PCA_COLUMNS]], dtype=float)
+        df_row = self._feature_frame(
+            pca_matrix,
+            np.array([float(amount_val)], dtype=float),
+            np.array([float(time_val)], dtype=float),
+        )
+        probs = self.model.predict_proba(df_row)[0]
+        fraud_prob = float(probs[1])
+        pred_class = int(fraud_prob >= settings.FRAUD_THRESHOLD)
+        shap_dict = self._shap_for_row(df_row)
+        return round(fraud_prob, 4), pred_class, shap_dict, self._risk_factors(shap_dict, fraud_prob)
 
     def predict_df(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Process bulk dataframe and append risk predictions"""
-        results = []
-        for idx, row in df.iterrows():
-            time_val = float(row.get("Time", 0.0))
-            amount_val = float(row.get("Amount", 0.0))
-            pca_dict = {f"V{i}": float(row.get(f"V{i}", 0.0)) for i in range(1, 29)}
-            prob, pred_class, shap_dict, risk_factors = self.predict_single(time_val, amount_val, pca_dict)
-            results.append({
-                "fraud_probability": prob,
-                "prediction_class": pred_class
-            })
-        res_df = pd.DataFrame(results)
-        return pd.concat([df.reset_index(drop=True), res_df], axis=1)
+        self._require_loaded()
+        pca_matrix = df[PCA_COLUMNS].astype(float).to_numpy()
+        amounts = df["Amount"].astype(float).to_numpy()
+        times = df["Time"].astype(float).to_numpy()
+        feature_frame = self._feature_frame(pca_matrix, amounts, times)
+        probs = self.model.predict_proba(feature_frame)[:, 1]
+        pred_class = (probs >= settings.FRAUD_THRESHOLD).astype(int)
+        result = df.copy().reset_index(drop=True)
+        result["fraud_probability"] = np.round(probs.astype(float), 4)
+        result["prediction_class"] = pred_class
+        return result
+
 
 ml_service = MLService()

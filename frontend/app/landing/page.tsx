@@ -30,8 +30,8 @@ export default function LandingPage() {
           <Link href="/login" className="text-xs font-semibold text-muted hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5">
             Log In
           </Link>
-          <Link href="/dashboard" className="text-xs font-semibold bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 active:scale-[0.98] glow-primary flex items-center gap-1.5">
-            View Live Demo
+          <Link href="/register" className="text-xs font-semibold bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg shadow-lg shadow-primary/25 transition-all duration-200 active:scale-[0.98] glow-primary flex items-center gap-1.5">
+            Get Started
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -81,10 +81,10 @@ export default function LandingPage() {
           className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full"
         >
           <Link 
-            href="/dashboard" 
+            href="/login" 
             className="w-full sm:w-auto text-sm font-semibold bg-white hover:bg-zinc-200 text-black px-8 py-3.5 rounded-xl shadow-xl transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
           >
-            Launch Terminal Dashboard
+            Launch Terminal
             <ArrowRight className="h-4.5 w-4.5" />
           </Link>
           <Link 
@@ -103,20 +103,20 @@ export default function LandingPage() {
           className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-4xl border border-border bg-[#09090b]/40 rounded-2xl p-6 glass-panel"
         >
           <div className="space-y-1">
-            <span className="text-2xl sm:text-3xl font-bold text-white block">99.94%</span>
-            <span className="text-xs text-muted block">Detection Accuracy</span>
+            <span className="text-2xl sm:text-3xl font-bold text-white block">XGBoost</span>
+            <span className="text-xs text-muted block">Champion classifier artifact</span>
           </div>
           <div className="space-y-1">
-            <span className="text-2xl sm:text-3xl font-bold text-white block">&lt; 38ms</span>
-            <span className="text-xs text-muted block">API Latency</span>
+            <span className="text-2xl sm:text-3xl font-bold text-white block">SHAP</span>
+            <span className="text-xs text-muted block">Local feature attributions</span>
           </div>
           <div className="space-y-1">
-            <span className="text-2xl sm:text-3xl font-bold text-white block">24/7</span>
-            <span className="text-xs text-muted block">Continuous Audit Ingestion</span>
+            <span className="text-2xl sm:text-3xl font-bold text-white block">JWT</span>
+            <span className="text-xs text-muted block">Protected analyst APIs</span>
           </div>
           <div className="space-y-1">
             <span className="text-2xl sm:text-3xl font-bold text-white block">SMOTE</span>
-            <span className="text-xs text-muted block">Imbalance Resampling Optimized</span>
+            <span className="text-xs text-muted block">Training-time class balance</span>
           </div>
         </motion.div>
       </section>
@@ -157,7 +157,7 @@ export default function LandingPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-warning/60" />
                 <span className="w-2.5 h-2.5 rounded-full bg-success/60" />
               </div>
-              <span className="text-[10px] text-muted font-mono uppercase tracking-wider">POST /api/v1/predict/single</span>
+              <span className="text-[10px] text-muted font-mono uppercase tracking-wider">POST /api/v1/predict</span>
             </div>
             <div className="p-5 font-mono text-xs text-zinc-300 overflow-x-auto space-y-3">
               <span className="text-zinc-500 block">// Ingestion Request Payload</span>
