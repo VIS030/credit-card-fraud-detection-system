@@ -1,26 +1,18 @@
-from datetime import datetime
+import uuid
+from pydantic import BaseModel, field_validator
 from typing import Optional
-
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from datetime import datetime
 
 
 class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
-    full_name: Optional[str] = Field(default="Analyst", max_length=120)
+    email: str
+    password: str
+    full_name: Optional[str] = "Analyst"
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=1, max_length=72)
-
-
-class UserUpdate(BaseModel):
-    full_name: Optional[str] = Field(default=None, max_length=120)
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
+    email: str
+    password: str
 
 
 class UserResponse(BaseModel):
@@ -31,14 +23,14 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
-    @field_validator("id", mode="before")
-    @classmethod
+    @field_validator('id', mode='before')
     def convert_uuid(cls, v):
         if v is not None:
             return str(v)
         return v
 
-    model_config = {"from_attributes": True}
+    class Config:
+        from_attributes = True
 
 
 class TokenResponse(BaseModel):

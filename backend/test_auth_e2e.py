@@ -109,7 +109,7 @@ def test_full_auth_and_prediction():
     print("Dashboard Volume Sum:", dash_resp["processed_volume"])
     print("Dashboard Fraud Alerts:", dash_resp["fraud_alerts"])
     assert dash_resp["total_processed"] >= 3, "Dashboard total processed count updated."
-    print("[OK] Dashboard metrics and aggregated stats dynamically reflect DB state.")
+    print("✓ Dashboard metrics and aggregated stats dynamically reflect DB state.")
 
     print("\n==================================================")
     print("SUCCESS: ALL AUTHENTICATION & E2E VERIFICATION CHECKS PASSED!")

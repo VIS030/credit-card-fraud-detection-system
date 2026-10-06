@@ -18,8 +18,7 @@ def run_ml_pipeline():
     print("="*60)
 
     # 1. Load Kaggle creditcard.csv dataset
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    csv_path = os.path.join(repo_root, "creditcard.csv")
+    csv_path = os.path.abspath("d:/C/Fraud/creditcard.csv")
     print(f"Ingesting transaction raw dataset from: {csv_path}")
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"Missing base creditcard.csv dataset at: {csv_path}")
@@ -122,7 +121,7 @@ def run_ml_pipeline():
 
     # 7. Model Serialization & Export
     # Create target directory for serialized binaries
-    target_dir = os.path.join(repo_root, "backend", "app", "models")
+    target_dir = os.path.abspath("d:/C/Fraud/backend/app/models")
     os.makedirs(target_dir, exist_ok=True)
     model_export_path = os.path.join(target_dir, "fraud_model.pkl")
     

@@ -3,13 +3,7 @@ creditcard.csv
 
 # Environment Variables
 .env
-.env.local
-.env.*.local
-!.env.example
-
-# Local SQLite databases
-*.db
-*.db-journal
+.env.*
 
 # Python
 __pycache__/
